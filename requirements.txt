@@ -8,4 +8,5 @@ tiktoken==0.6.0
 pdfminer.six==20221105
 python-dotenv==1.0.1
 requests==2.31.0
-duckduckgo-search
+duckduckgo-search==0.9
+groq
