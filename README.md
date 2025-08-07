@@ -14,19 +14,21 @@ ThyBot is a personalized, LLM-powered health assistant built with Streamlit that
 - [8. Example Data](#-example-data)
 - [9. Future Enhancements](#-future-enhancements)
 
-## 🔍 Background
+---
+
+## Background
 
 Thyroid disorders affect over **42 million** Indians and are often underdiagnosed. Managing thyroid-related conditions like **hypothyroidism** and **hyperthyroidism** requires dietary care, consistent monitoring, and accessible education — areas where many patients struggle due to lack of guidance and personalized support.
 
 ---
 
-## ❓ Problem Statement
+## Problem Statement
 
 There is a lack of **interactive**, **AI-powered**, and **diet-aware** tools tailored for thyroid patients. Existing platforms rarely provide dietary recommendations based on **thyroid type**, and none incorporate intelligent document/question understanding.
 
 ---
 
-## 🎯 Objectives
+## Objectives
 
 - Predict thyroid condition using a medical profile
 - Classify Indian meals as thyroid-friendly or not
@@ -36,7 +38,7 @@ There is a lack of **interactive**, **AI-powered**, and **diet-aware** tools tai
 
 ---
 
-## ✨ Features
+## Features
 
 ✔️ **Thyroid Condition Predictor**  
 ✔️ **Meal Classifier with Nutrient Insights**  
@@ -48,7 +50,7 @@ There is a lack of **interactive**, **AI-powered**, and **diet-aware** tools tai
 
 ---
 
-## ⚙️ Tech Stack
+## Tech Stack
 
 - **Frontend**: Streamlit
 - **LLM**: Groq (LLaMA3)
