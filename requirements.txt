@@ -11,3 +11,4 @@ requests==2.31.0
 duckduckgo-search
 groq
 sentence-transformers
+pypdf
