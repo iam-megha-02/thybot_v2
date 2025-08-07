@@ -1,0 +1,21 @@
+# Hide API key file
+config/config.py
+
+# Ignore large files
+data/faiss_index.pkl
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# VS Code
+.vscode/
+
+# Env files
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
