@@ -6,6 +6,7 @@ from utils.web_search import perform_web_search
 from models.llm import get_groq_model
 from utils.rag_utils import load_and_split_pdf, embed_chunks, retrieve_relevant_chunks
 
+GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 
 # ------------------ UTILS ------------------
 def detect_thyroid_type(tsh, t3, t4):
