@@ -126,7 +126,7 @@ def patient_profile_page():
             st.session_state.editing_profile = True
             st.rerun()
 
---------------------------------------
+# -------------- WEB-SEARCH ------------------------
 
 LOW_CONFIDENCE_FLAGS = [
     "i don't know", "i am not sure", "not sure", "cannot find", "no information",
