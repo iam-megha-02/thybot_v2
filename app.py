@@ -82,20 +82,38 @@ def patient_profile_page():
                 st.markdown(f"**Age:** {profile.get('age', 'N/A')} | **Gender:** {profile.get('gender', 'N/A')} | **BMI:** {profile.get('bmi', 0.0):.2f}")
             
             with col2:
-                st.write("Thyroid Status")
                 status = profile.get('thyroid_type', 'N/A')
-                st.markdown(f"<p style='font-size: 1.25rem; font-weight: 600;'>{status}</p>", unsafe_allow_html=True)
+                st.markdown(
+                    f"""
+                    <div style="text-align: right;">
+                        <p style="font-size: 0.9rem; margin-bottom: -5px;">Thyroid Status</p>
+                        <p style="font-size: 1.25rem; font-weight: 600;">{status}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
             
             st.markdown("---")
 
+            # --- THIS ENTIRE BLOCK IS CHANGED TO CENTER-ALIGN THE METRICS ---
             c1, c2, c3 = st.columns(3)
-            c1.metric("TSH (mIU/L)", f"{profile.get('tsh', 0.0):.2f}")
-            c2.metric("Free T3 (pg/mL)", f"{profile.get('t3', 0.0):.2f}")
-            c3.metric("Free T4 (ng/dL)", f"{profile.get('t4', 0.0):.2f}")
+            
+            metric_style = "text-align: center;"
+            
+            with c1:
+                st.markdown(f"<div style='{metric_style}'><p style='font-size: 0.9rem; margin-bottom: -5px;'>TSH (mIU/L)</p><p style='font-size: 2rem; font-weight: 600;'>{profile.get('tsh', 0.0):.2f}</p></div>", unsafe_allow_html=True)
+
+            with c2:
+                st.markdown(f"<div style='{metric_style}'><p style='font-size: 0.9rem; margin-bottom: -5px;'>Free T3 (pg/mL)</p><p style='font-size: 2rem; font-weight: 600;'>{profile.get('t3', 0.0):.2f}</p></div>", unsafe_allow_html=True)
+                
+            with c3:
+                st.markdown(f"<div style='{metric_style}'><p style='font-size: 0.9rem; margin-bottom: -5px;'>Free T4 (ng/dL)</p><p style='font-size: 2rem; font-weight: 600;'>{profile.get('t4', 0.0):.2f}</p></div>", unsafe_allow_html=True)
+
 
         if st.button(" Edit Profile"):
             st.session_state.editing_profile = True
             st.rerun()
+                
             
 
 # ------------------ CHAT PAGE ------------------               
