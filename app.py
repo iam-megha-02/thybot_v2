@@ -117,10 +117,10 @@ def patient_profile_page():
             
 
 # ------------------ CHAT PAGE ------------------               
-
 def chat_page():
     chat_model = get_groq_model()
 
+    # --- Session State Initialization ---
     if "response_mode" not in st.session_state:
         st.session_state.response_mode = "Concise"
     if "messages" not in st.session_state:
@@ -129,56 +129,78 @@ def chat_page():
         st.session_state.patient_profile = {}
 
     st.title("ThyBot")
-    st.markdown("Ask anything about thyroid health.")
+    st.markdown("Your AI assistant for thyroid health. Ask me anything!")
 
+    # --- Sidebar for Controls ---
     with st.sidebar:
+        st.markdown("### Chat Settings")
         st.session_state.response_mode = st.radio(
             "Response Style",
             ["Concise", "Detailed"],
-            index=0 if st.session_state.response_mode == "Concise" else 1
+            index=0 if st.session_state.response_mode == "Concise" else 1,
+            horizontal=True
         )
+        if st.button("Clear Chat History"):
+            st.session_state.messages = []
+            st.rerun()
 
-    uploaded_file = st.file_uploader("Upload a PDF (lab report)", type=["pdf"])
-    if uploaded_file:
-        st.session_state["chunks"] = load_and_split_pdf(uploaded_file)
-        st.session_state["faiss_index"] = embed_chunks(st.session_state["chunks"])
-        st.success("Document embedded for retrieval!")
+        st.markdown("---")
+        st.markdown("### Document Analysis (RAG)")
+        uploaded_file = st.file_uploader("Upload a PDF report for context", type=["pdf"])
+        if uploaded_file:
+            with st.spinner("Processing document..."):
+                st.session_state["chunks"] = load_and_split_pdf(uploaded_file)
+                st.session_state["faiss_index"] = embed_chunks(st.session_state["chunks"])
+            st.success("Document ready for questions!")
 
+
+    # --- Display Chat History ---
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Type your question here..."):
+    # --- Handle New User Input ---
+    if prompt := st.chat_input("What would you like to know?"):
         st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 profile = st.session_state.patient_profile
-                thyroid_type = profile.get("thyroid_type", "Not set")
+                thyroid_type = profile.get("thyroid_type", "Not specified")
 
-                system_prompt = (
-                    f"You are a helpful medical assistant. The user has {thyroid_type}. Keep the answer brief and to the point."
-                    if st.session_state.response_mode == "Concise"
-                    else f"You are a helpful medical assistant. The user has {thyroid_type}. Provide a detailed explanation."
+                system_message_content = (
+                    f"You are ThyBot, an expert AI medical assistant specializing in thyroid health. "
+                    f"The user's thyroid status is '{thyroid_type}'. "
+                    f"Your response style should be {st.session_state.response_mode}."
                 )
 
+                context = ""
+                
                 if "faiss_index" in st.session_state:
                     docs = retrieve_relevant_chunks(prompt, st.session_state["faiss_index"])
-                    context = "\n\n".join([doc.page_content for doc in docs])
-                    full_prompt = f"Context: {context}\n\nUser: {prompt}\n\nAnswer {('briefly' if st.session_state.response_mode == 'Concise' else 'in detail')}"
-                    response = chat_model.invoke(full_prompt)
-                    reply = response.content if hasattr(response, "content") else response
-                else:
-                    response = chat_model.invoke([
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt}
-                    ])
-                    reply = response.content if hasattr(response, "content") else response
+                    if docs:
+                        context = "\n\n".join([doc.page_content for doc in docs])
+                        system_message_content += (
+                            "\n\nUse the following document context to answer the user's question. "
+                            "If the context doesn't contain the answer, say so and answer based on your general knowledge.\n\n"
+                            f"CONTEXT:\n---\n{context}"
+                        )
+
+            
+                messages_for_llm = [
+                    {"role": "system", "content": system_message_content}
+                ] + st.session_state.messages
+
+                response = chat_model.invoke(messages_for_llm)
+                reply = response.content if hasattr(response, "content") else str(response)
 
                 st.markdown(reply)
                 st.session_state.messages.append({"role": "assistant", "content": reply})
+                 
 
-
+# ------------------ MEAL PAGE ------------------  
 def meal_analysis_page():
     st.title("Meal Analysis")
     st.markdown("Add food items to analyze whether they are thyroid-friendly.")
