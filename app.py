@@ -50,8 +50,21 @@ def load_and_split_document(uploaded_file):
 
 # ------------------ PAGE FUNCTIONS ------------------
 
+def home_page():
+    st.title("Welcome to ThyBot!")
+    st.markdown("### Your AI-Powered Companion for Navigating Thyroid Health")
+    st.markdown("---")
+    st.info("To get started, create your profile on the **Patient Profile** page. This will allow ThyBot to provide personalized insights and analysis.")
+    st.markdown("""
+    **What can ThyBot do?**
+    - **General Chat:** Ask any question about thyroid health.
+    - **Document Chat:** Upload your lab reports for a detailed analysis and ask specific questions about them.
+    - **Meal Analysis:** Get personalized feedback on whether your meals are thyroid-friendly.
+    """)
+
 def patient_profile_page():
     st.title("👤 Patient Profile")
+    st.markdown("This is the most important step. Enter your information here so ThyBot can provide personalized responses.")
     if "patient_profile" not in st.session_state:
         st.session_state.patient_profile = {} 
     if "editing_profile" not in st.session_state:
@@ -114,10 +127,9 @@ def patient_profile_page():
 
 def general_chat_page():
     st.title("General Chat")
-    st.markdown("Ask general questions about thyroid health. This chat uses your patient profile for context.")
+    st.markdown("Ask general questions about thyroid health. This chat uses your patient profile and the selected response style for context.")
     chat_model = get_groq_model()
 
-    # --- Chat Interface Logic (Simplified) ---
     if "general_messages" not in st.session_state:
         st.session_state.general_messages = []
 
@@ -138,10 +150,12 @@ def general_chat_page():
             with st.spinner("Thinking..."):
                 profile = st.session_state.get("patient_profile", {})
                 thyroid_type = profile.get("thyroid_type", "Not specified")
+                response_style = st.session_state.get("response_mode", "Detailed")
                 
-                system_message = f"You are ThyBot, an expert AI medical assistant specializing in thyroid health. The user's current thyroid status is '{thyroid_type}'. Always be helpful and answer questions to the best of your ability."
+                system_message = (f"You are ThyBot, an expert AI medical assistant specializing in thyroid health. "
+                                  f"The user's current thyroid status is '{thyroid_type}'. "
+                                  f"Your response style should be {response_style}. Always be helpful and answer questions to the best of your ability.")
                 
-                # We need to format the history correctly for the model
                 messages_for_llm = [{"role": "system", "content": system_message}]
                 for msg in st.session_state.general_messages:
                     messages_for_llm.append({"role": msg["role"], "content": msg["content"]})
@@ -154,7 +168,7 @@ def general_chat_page():
 
 def document_chat_page():
     st.title("Document Chat")
-    st.markdown("Upload a document (`PDF`, `DOCX`, `TXT`) to ask specific questions about its contents.")
+    st.markdown("Upload a document (`PDF`, `DOCX`, `TXT`) to ask specific questions about its contents. This chat will focus *only* on the document.")
     chat_model = get_groq_model()
 
     uploaded_file = st.file_uploader("Upload a document", type=["pdf", "docx", "txt"], label_visibility="collapsed")
@@ -180,9 +194,15 @@ def document_chat_page():
                 with st.spinner("Thinking..."):
                     profile = st.session_state.get("patient_profile", {})
                     thyroid_type = profile.get("thyroid_type", "Not specified")
+                    response_style = st.session_state.get("response_mode", "Detailed")
+                    
                     docs = retrieve_relevant_chunks(prompt, st.session_state["doc_faiss_index"])
                     context = "\n\n".join([doc.page_content for doc in docs])
-                    system_message_content = (f"You are ThyBot, an expert AI assistant. Answer questions based ONLY on the provided document context. The user's thyroid status is '{thyroid_type}'.\n\nCONTEXT:\n---\n{context}")
+                    
+                    system_message_content = (f"You are ThyBot, an expert AI assistant. Answer questions based ONLY on the provided document context. "
+                                              f"The user's thyroid status is '{thyroid_type}'. Your response style should be {response_style}.\n\n"
+                                              f"CONTEXT:\n---\n{context}")
+                    
                     messages_for_llm = [{"role": "system", "content": system_message_content}, {"role": "user", "content": prompt}]
                     response = chat_model.invoke(messages_for_llm)
                     reply = response.content if hasattr(response, "content") else str(response)
@@ -198,7 +218,7 @@ def document_chat_page():
 
 def meal_analysis_page():
     st.title("Meal Analysis")
-    st.markdown("Select food items from a list to analyze the impact on your thyroid health.")
+    st.markdown("Select food items from a list to analyze the impact on your thyroid health. This analysis is personalized using your patient profile.")
     chat_model = get_groq_model()
     @st.cache_data
     def load_food_data():
@@ -232,7 +252,7 @@ def meal_analysis_page():
                 if st.button("✖️", key=f"remove_{i}", help="Remove item"):
                     st.session_state.meal_items.pop(i)
                     st.rerun()
-    if st.session_state.meal_items and st.button("Analyze Meal"):
+    if st.session_state.meal_items and st.button("🍽️ Analyze Meal"):
         with st.spinner("Analyzing your meal..."):
             for item in st.session_state.meal_items:
                 match = df[df['Dish Name'] == item]
@@ -252,13 +272,25 @@ def main():
 
     with st.sidebar:
         st.image("assets/logo.png", width=150)
-        st.markdown("Select a feature from below:")
+        st.markdown("### Settings")
+        st.session_state.response_mode = st.radio(
+            "Response Style", ["Concise", "Detailed"],
+            index=st.session_state.get("response_mode_index", 1), # Default to Detailed
+            help="Choose how you want the AI to respond in the chat sessions."
+        )
+        st.session_state.response_mode_index = ["Concise", "Detailed"].index(st.session_state.response_mode)
+        
+        st.markdown("---")
+        st.markdown("### Navigation")
         page = st.radio(
             "Navigation",
-            ["Patient Profile", "General Chat", "Document Chat", "Meal Analysis"]
+            ["Home", "Patient Profile", "General Chat", "Document Chat", "Meal Analysis"],
+            label_visibility="collapsed"
         )
 
-    if page == "Patient Profile":
+    if page == "Home":
+        home_page()
+    elif page == "Patient Profile":
         patient_profile_page()
     elif page == "General Chat":
         general_chat_page()
