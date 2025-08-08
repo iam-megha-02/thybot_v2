@@ -2,8 +2,6 @@
 import streamlit as st
 import pandas as pd
 from langchain_core.messages import HumanMessage
-# REMOVED: Unused imports
-# from utils.web_search import perform_web_search
 from models.llm import get_groq_model
 from utils.rag_utils import embed_chunks, retrieve_relevant_chunks
 import tempfile
