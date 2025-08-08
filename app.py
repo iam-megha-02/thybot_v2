@@ -24,21 +24,16 @@ def patient_profile_page():
     st.title("👤 Patient Profile")
 
     # --- STATE MANAGEMENT ---
-    # Decide whether to show the form or the display card.
-    # Show the form if we are explicitly in editing mode, OR if no profile exists yet.
     if "patient_profile" not in st.session_state:
-        st.session_state.patient_profile = {} # Ensure profile exists
+        st.session_state.patient_profile = {} 
     
     if "editing_profile" not in st.session_state:
-        # If a profile is already saved from a previous session, show the card. Otherwise, show the form.
         st.session_state.editing_profile = not st.session_state.patient_profile.get("name")
-
 
     # ------------------ 1. THE EDITING VIEW (FORM) ------------------
     if st.session_state.editing_profile:
         st.markdown("Enter or update the patient’s health information below.")
         
-        # Pre-fill form with existing data if it exists
         profile_data = st.session_state.patient_profile
         
         with st.form("profile_form"):
@@ -71,9 +66,9 @@ def patient_profile_page():
                     "thyroid_type": thyroid_type,
                     "weight": weight, "height": height, "bmi": bmi,
                 }
-                st.session_state.editing_profile = False  # Switch to display view
+                st.session_state.editing_profile = False
                 st.success(f"✅ Profile for **{name}** saved!")
-                st.rerun() # Rerun to reflect the view change immediately
+                st.rerun()
 
     # ------------------ 2. THE DISPLAY VIEW (CARD) ------------------
     else:
@@ -87,7 +82,8 @@ def patient_profile_page():
                 st.markdown(f"**Age:** {profile.get('age', 'N/A')} | **Gender:** {profile.get('gender', 'N/A')} | **BMI:** {profile.get('bmi', 0.0):.2f}")
             
             with col2:
-                st.metric(label="Thyroid Status", value=profile.get('thyroid_type', 'N/A'))
+                st.write("Thyroid Status") # Use st.write for the small label
+                st.markdown(f"<h4>{profile.get('thyroid_type', 'N/A')}</h4>", unsafe_allow_html=True)
             
             st.markdown("---")
 
@@ -96,12 +92,10 @@ def patient_profile_page():
             c2.metric("Free T3 (pg/mL)", f"{profile.get('t3', 0.0):.2f}")
             c3.metric("Free T4 (ng/dL)", f"{profile.get('t4', 0.0):.2f}")
 
-        # Button to switch back to editing mode
         if st.button("✏️ Edit Profile"):
             st.session_state.editing_profile = True
             st.rerun()
-
-       
+            
 
 # ------------------ CHAT PAGE ------------------               
 
