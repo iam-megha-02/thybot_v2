@@ -1,30 +1,8 @@
-from duckduckgo_search import DDGS
-from models.llm import get_groq_model
+from langchain_community.tools import DuckDuckGoSearchRun
 
-
-def perform_web_search(query, max_results=5):
+def get_web_search_tool():
     """
-    Perform a web search using DuckDuckGo and return top results.
-    Each result includes title, snippet, and link.
+    Initializes and returns the DuckDuckGo search tool.
+    This function centralizes the tool's creation, following the project's modular structure.
     """
-    with DDGS() as ddgs:
-        results = ddgs.text(query, max_results=max_results)
-        formatted_results = []
-        for res in results:
-            title = res.get("title", "No title")
-            snippet = res.get("body", "No description available.")
-            link = res.get("href", "#")
-            formatted_results.append(f"{title} - {snippet} ({link})")
-        return formatted_results
-
-
-def get_completion(prompt):
-    """
-    Summarize the search results using Groq LLM.
-    """
-    try:
-        model = get_groq_model()
-        response = model.invoke([{"role": "user", "content": prompt}])
-        return response.content
-    except Exception as e:
-        return f"⚠️ Failed to summarize: {str(e)}"
+    return DuckDuckGoSearchRun()
