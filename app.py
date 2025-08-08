@@ -20,46 +20,69 @@ def detect_thyroid_type(tsh, t3, t4):
 
 
 # ------------------ PAGE FUNCTIONS ------------------
-
 def patient_profile_page():
     st.title("👤 Patient Profile")
     st.markdown("Enter the patient’s basic and thyroid health information.")
 
+    # --- Form for Input ---
     with st.form("profile_form"):
-        name = st.text_input("Full Name")
-        age = st.number_input("Age", min_value=0, step=1)
-        gender = st.selectbox("Gender", ["Female", "Male", "Other"])
+        # Use columns for a more compact layout
+        col1, col2 = st.columns(2)
+        with col1:
+            name = st.text_input("Full Name")
+            age = st.number_input("Age", min_value=0, max_value=120, step=1)
+            gender = st.selectbox("Gender", ["Female", "Male", "Other"])
 
-        st.markdown("### Thyroid Lab Values")
+        with col2:
+            weight = st.number_input("Weight (kg)", min_value=0.0, step=0.1, format="%.1f")
+            height = st.number_input("Height (cm)", min_value=0.0, step=0.1, format="%.1f")
+            # Automatically calculate BMI if height is provided
+            bmi = (weight / ((height / 100) ** 2)) if height > 0 else 0
+
+        st.markdown("---")
+        st.markdown("<h5>Thyroid Lab Values</h5>", unsafe_allow_html=True)
         tsh = st.number_input("TSH (mIU/L)", step=0.1, format="%.2f")
         t3 = st.number_input("Free T3 (pg/mL)", step=0.1, format="%.2f")
         t4 = st.number_input("Free T4 (ng/dL)", step=0.1, format="%.2f")
 
-        st.markdown("### Other Information (Optional)")
-        weight = st.number_input("Weight (kg)", step=0.1)
-        height = st.number_input("Height (cm)", step=0.1)
-        symptoms = st.text_area("Symptoms", placeholder="Fatigue, hair loss, weight gain...")
-        medication = st.text_area("Ongoing Medications")
+        st.markdown("---")
+        st.markdown("<h5>Other Information (Optional)</h5>", unsafe_allow_html=True)
+        symptoms = st.text_area("Symptoms", placeholder="e.g., Fatigue, hair loss, weight gain...")
+        medication = st.text_area("Current Medications", placeholder="e.g., Levothyroxine 50mcg, Metformin...")
 
         submitted = st.form_submit_button("Save Profile")
 
         if submitted:
             thyroid_type = detect_thyroid_type(tsh, t3, t4)
             st.session_state.patient_profile = {
-                "name": name,
-                "age": age,
-                "gender": gender,
-                "tsh": tsh,
-                "t3": t3,
-                "t4": t4,
+                "name": name, "age": age, "gender": gender,
+                "tsh": tsh, "t3": t3, "t4": t4,
                 "thyroid_type": thyroid_type,
-                "weight": weight,
-                "height": height,
-                "symptoms": symptoms,
-                "medication": medication
+                "weight": weight, "height": height, "bmi": bmi,
+                "symptoms": symptoms, "medication": medication
             }
-            st.success(f"✅ Profile Saved! Thyroid Type: **{thyroid_type}**")
+            st.success(f"✅ Profile for **{name}** saved! Thyroid Status: **{thyroid_type}**")
 
+    # --- Display Saved Profile ---
+    if "patient_profile" in st.session_state and st.session_state.patient_profile.get("name"):
+        st.markdown("---")
+        with st.expander("View Current Patient Profile", expanded=True):
+            profile = st.session_state.patient_profile
+            st.markdown(f"**Name:** {profile['name']} | **Age:** {profile['age']} | **Gender:** {profile['gender']}")
+            st.markdown(f"**Weight:** {profile['weight']} kg | **Height:** {profile['height']} cm | **BMI:** {profile['bmi']:.2f}")
+            st.metric(label="Thyroid Status", value=profile['thyroid_type'])
+
+            col1, col2, col3 = st.columns(3)
+            col1.metric("TSH (mIU/L)", f"{profile['tsh']:.2f}")
+            col2.metric("Free T3 (pg/mL)", f"{profile['t3']:.2f}")
+            col3.metric("Free T4 (ng/dL)", f"{profile['t4']:.2f}")
+
+            if profile['symptoms']:
+                st.markdown(f"**Symptoms:** {profile['symptoms']}")
+            if profile['medication']:
+                st.markdown(f"**Medications:** {profile['medication']}")      
+
+# ------------------ CHAT PAGE ------------------               
 
 def chat_page():
     chat_model = get_groq_model()
