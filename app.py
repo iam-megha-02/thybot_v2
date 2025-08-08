@@ -4,6 +4,7 @@ import pandas as pd
 from langchain_core.messages import HumanMessage, AIMessage
 from models.llm import get_groq_model
 from utils.rag_utils import embed_chunks, retrieve_relevant_chunks
+from utils.web_search import perform_web_search, get_completion
 import tempfile
 import os
 
@@ -125,9 +126,46 @@ def patient_profile_page():
             st.session_state.editing_profile = True
             st.rerun()
 
+--------------------------------------
+
+LOW_CONFIDENCE_FLAGS = [
+    "i don't know", "i am not sure", "not sure", "cannot find", "no information",
+    "i don’t have enough information", "insufficient", "can't answer", "cannot answer"
+]
+
+def needs_web_search(reply: str) -> bool:
+    if not reply:
+        return True
+    text = reply.strip().lower()
+    if text == "[[need_web]]":
+        return True
+    if len(text) < 40 and any(w in text for w in ["maybe", "unsure", "unclear", "unknown"]):
+        return True
+    if any(flag in text for flag in LOW_CONFIDENCE_FLAGS):
+        return True
+    return False
+
+def summarize_search_for_thyroid(query: str, results: list) -> str:
+    if not results:
+        return "I couldn’t find reliable sources right now. Try rephrasing or a different angle."
+    lines = []
+    for i, r in enumerate(results, 1):
+        title = r.get("title", "No title")
+        snippet = r.get("snippet", "No description available.")
+        link = r.get("link", "#")
+        lines.append(f"{i}. {title} — {snippet} ({link})")
+    prompt = (
+        "You are ThyBot, a thyroid-focused assistant. Using ONLY the snippets below, write a concise, reliable answer. "
+        "Highlight consensus, note contradictions if any, and give 2–3 practical tips. "
+        "Do not invent facts beyond these snippets.\n\n" + "\n".join(lines)
+    )
+    return get_completion(prompt) or "No summary generated."
+
+
 def general_chat_page():
     st.title("General Chat")
-    st.markdown("Ask general questions about thyroid health. This chat uses your patient profile and the selected response style for context.")
+    st.markdown("Ask anything about thyroid health.")
+
     chat_model = get_groq_model()
 
     if "general_messages" not in st.session_state:
@@ -137,6 +175,7 @@ def general_chat_page():
         st.session_state.general_messages = []
         st.rerun()
 
+    # Render previous messages
     for message in st.session_state.general_messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
@@ -151,20 +190,44 @@ def general_chat_page():
                 profile = st.session_state.get("patient_profile", {})
                 thyroid_type = profile.get("thyroid_type", "Not specified")
                 response_style = st.session_state.get("response_mode", "Detailed")
-                
-                system_message = (f"You are ThyBot, an expert AI medical assistant specializing in thyroid health. "
-                                  f"The user's current thyroid status is '{thyroid_type}'. "
-                                  f"Your response style should be {response_style}. Always be helpful and answer questions to the best of your ability.")
-                
-                messages_for_llm = [{"role": "system", "content": system_message}]
-                for msg in st.session_state.general_messages:
-                    messages_for_llm.append({"role": msg["role"], "content": msg["content"]})
-                
-                response = chat_model.invoke(messages_for_llm)
-                reply = response.content if hasattr(response, "content") else str(response)
 
-                st.markdown(reply)
-                st.session_state.general_messages.append({"role": "assistant", "content": reply})
+                # System message tells LLM to signal [[NEED_WEB]] if unsure
+                system_message = (
+                    "You are ThyBot, an expert AI assistant for thyroid health. "
+                    f"The user's thyroid status is '{thyroid_type}'. "
+                    f"Your response style should be {response_style}. "
+                    "If you are NOT reasonably certain based on your internal knowledge, reply EXACTLY with [[NEED_WEB]] and nothing else."
+                )
+
+                messages_for_llm = [{"role": "system", "content": system_message}]
+                # Keep recent history short to avoid long context
+                for msg in st.session_state.general_messages[-8:]:
+                    messages_for_llm.append({"role": msg["role"], "content": msg["content"]})
+
+            
+                try:
+                    response = chat_model.invoke(messages_for_llm)
+                    reply = response.content if hasattr(response, "content") else str(response)
+                except Exception as e:
+                    reply = f"⚠️ Error generating response: {e}"
+
+            
+                if needs_web_search(reply):
+                    try:
+                        results = perform_web_search(prompt, max_results=6)
+                        summary = summarize_search_for_thyroid(prompt, results)
+                        st.markdown(summary)
+                        with st.expander("Sources"):
+                            for r in results:
+                                st.markdown(f"- [{r.get('title','Source')}]({r.get('link','#')})\n\n> {r.get('snippet','')}")
+                        st.session_state.general_messages.append({"role": "assistant", "content": summary})
+                    except Exception as e:
+                        fallback_msg = f"⚠️ Web search failed: {e}"
+                        st.markdown(fallback_msg)
+                        st.session_state.general_messages.append({"role": "assistant", "content": fallback_msg})
+                else:
+                    st.markdown(reply)
+                    st.session_state.general_messages.append({"role": "assistant", "content": reply})
 
 def document_chat_page():
     st.title("Document Chat")
