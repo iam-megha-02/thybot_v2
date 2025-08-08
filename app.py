@@ -124,7 +124,8 @@ def general_chat_page():
     chat_model = get_groq_model()
 
     # --- Agent Setup ---
-    search_tool = DuckDuckGoSearchRun()
+    from utils.web_search import get_web_search_tool 
+    search_tool = get_web_search_tool()
     tools = [search_tool]
     prompt = hub_pull("hwchase17/xml-agent-convo")
     agent = create_tool_calling_agent(chat_model, tools, prompt)
