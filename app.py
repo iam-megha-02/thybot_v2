@@ -12,6 +12,7 @@ from langchain_community.tools import DuckDuckGoSearchRun
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchainhub import pull as hub_pull
+from utils.web_search import get_web_search_tool 
 
 # Imports for Document Handling
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, TextLoader
@@ -124,23 +125,34 @@ def general_chat_page():
     chat_model = get_groq_model()
 
     # --- Agent Setup ---
-    from utils.web_search import get_web_search_tool 
     search_tool = get_web_search_tool()
     tools = [search_tool]
-    prompt = hub_pull("hwchase17/xml-agent-convo")
-    agent = create_tool_calling_agent(chat_model, tools, prompt)
+
+    profile = st.session_state.get("patient_profile", {})
+    thyroid_type = profile.get("thyroid_type", "Not specified")
+    
+    system_message = f"You are ThyBot, an expert AI medical assistant specializing in thyroid health. The user's current thyroid status is '{thyroid_type}'. Use your tools to answer questions you don't know, especially for real-time information like weather or recent news. Always be helpful."
+    
+    agent_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", system_message),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("user", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ]
+    )
+
+    # The Agent and AgentExecutor
+    agent = create_tool_calling_agent(chat_model, tools, agent_prompt)
     agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
+    # --- Chat Interface Logic ---
     if "general_messages" not in st.session_state:
         st.session_state.general_messages = []
 
-    with st.sidebar:
-        st.markdown("### Chat Settings")
-        st.session_state.response_mode = st.radio("Response Style", ["Concise", "Detailed"], index=st.session_state.get("response_mode_index", 0), horizontal=True)
-        st.session_state.response_mode_index = ["Concise", "Detailed"].index(st.session_state.response_mode)
-        if st.button("Clear Chat History"):
-            st.session_state.general_messages = []
-            st.rerun()
+    if st.sidebar.button("Clear Chat History"):
+        st.session_state.general_messages = []
+        st.rerun()
 
     for message in st.session_state.general_messages:
         with st.chat_message(message.type):
@@ -152,12 +164,10 @@ def general_chat_page():
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            with st.spinner("Thinking... "):
-                profile = st.session_state.get("patient_profile", {})
-                thyroid_type = profile.get("thyroid_type", "Not specified")
+            with st.spinner("Thinking... (and maybe searching the web)"):
                 
                 response = agent_executor.invoke({
-                    "input": f"User's thyroid status is '{thyroid_type}'. Respond in a {st.session_state.response_mode} style. User's question: {prompt}",
+                    "input": prompt,
                     "chat_history": st.session_state.general_messages[:-1]
                 })
                 
