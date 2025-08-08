@@ -22,65 +22,86 @@ def detect_thyroid_type(tsh, t3, t4):
 # ------------------ PAGE FUNCTIONS ------------------
 def patient_profile_page():
     st.title("👤 Patient Profile")
-    st.markdown("Enter the patient’s basic and thyroid health information.")
 
-    # --- Form for Input ---
-    with st.form("profile_form"):
-        # Use columns for a more compact layout
-        col1, col2 = st.columns(2)
-        with col1:
-            name = st.text_input("Full Name")
-            age = st.number_input("Age", min_value=0, max_value=120, step=1)
-            gender = st.selectbox("Gender", ["Female", "Male", "Other"])
+    # --- STATE MANAGEMENT ---
+    # Decide whether to show the form or the display card.
+    # Show the form if we are explicitly in editing mode, OR if no profile exists yet.
+    if "patient_profile" not in st.session_state:
+        st.session_state.patient_profile = {} # Ensure profile exists
+    
+    if "editing_profile" not in st.session_state:
+        # If a profile is already saved from a previous session, show the card. Otherwise, show the form.
+        st.session_state.editing_profile = not st.session_state.patient_profile.get("name")
 
-        with col2:
-            weight = st.number_input("Weight (kg)", min_value=0.0, step=0.1, format="%.1f")
-            height = st.number_input("Height (cm)", min_value=0.0, step=0.1, format="%.1f")
-            # Automatically calculate BMI if height is provided
-            bmi = (weight / ((height / 100) ** 2)) if height > 0 else 0
 
-        st.markdown("---")
-        st.markdown("<h5>Thyroid Lab Values</h5>", unsafe_allow_html=True)
-        tsh = st.number_input("TSH (mIU/L)", step=0.1, format="%.2f")
-        t3 = st.number_input("Free T3 (pg/mL)", step=0.1, format="%.2f")
-        t4 = st.number_input("Free T4 (ng/dL)", step=0.1, format="%.2f")
+    # ------------------ 1. THE EDITING VIEW (FORM) ------------------
+    if st.session_state.editing_profile:
+        st.markdown("Enter or update the patient’s health information below.")
+        
+        # Pre-fill form with existing data if it exists
+        profile_data = st.session_state.patient_profile
+        
+        with st.form("profile_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                name = st.text_input("Full Name", value=profile_data.get("name", ""))
+                age = st.number_input("Age", min_value=0, max_value=120, step=1, value=profile_data.get("age", 0))
+                gender_options = ["Female", "Male", "Other"]
+                gender_index = gender_options.index(profile_data.get("gender", "Female")) if profile_data.get("gender") in gender_options else 0
+                gender = st.selectbox("Gender", gender_options, index=gender_index)
 
-        st.markdown("---")
-        st.markdown("<h5>Other Information (Optional)</h5>", unsafe_allow_html=True)
-        symptoms = st.text_area("Symptoms", placeholder="e.g., Fatigue, hair loss, weight gain...")
-        medication = st.text_area("Current Medications", placeholder="e.g., Levothyroxine 50mcg, Metformin...")
+            with col2:
+                weight = st.number_input("Weight (kg)", min_value=0.0, step=0.1, format="%.1f", value=profile_data.get("weight", 0.0))
+                height = st.number_input("Height (cm)", min_value=0.0, step=0.1, format="%.1f", value=profile_data.get("height", 0.0))
+                bmi = (weight / ((height / 100) ** 2)) if height > 0 else 0
 
-        submitted = st.form_submit_button("Save Profile")
+            st.markdown("---")
+            st.markdown("<h5>Thyroid Lab Values</h5>", unsafe_allow_html=True)
+            tsh = st.number_input("TSH (mIU/L)", step=0.1, format="%.2f", value=profile_data.get("tsh", 0.0))
+            t3 = st.number_input("Free T3 (pg/mL)", step=0.1, format="%.2f", value=profile_data.get("t3", 0.0))
+            t4 = st.number_input("Free T4 (ng/dL)", step=0.1, format="%.2f", value=profile_data.get("t4", 0.0))
 
-        if submitted:
-            thyroid_type = detect_thyroid_type(tsh, t3, t4)
-            st.session_state.patient_profile = {
-                "name": name, "age": age, "gender": gender,
-                "tsh": tsh, "t3": t3, "t4": t4,
-                "thyroid_type": thyroid_type,
-                "weight": weight, "height": height, "bmi": bmi,
-                "symptoms": symptoms, "medication": medication
-            }
-            st.success(f"✅ Profile for **{name}** saved! Thyroid Status: **{thyroid_type}**")
+            submitted = st.form_submit_button("Save Profile")
 
-    # --- Display Saved Profile ---
-    if "patient_profile" in st.session_state and st.session_state.patient_profile.get("name"):
-        st.markdown("---")
-        with st.expander("View Current Patient Profile", expanded=True):
-            profile = st.session_state.patient_profile
-            st.markdown(f"**Name:** {profile['name']} | **Age:** {profile['age']} | **Gender:** {profile['gender']}")
-            st.markdown(f"**Weight:** {profile['weight']} kg | **Height:** {profile['height']} cm | **BMI:** {profile['bmi']:.2f}")
-            st.metric(label="Thyroid Status", value=profile['thyroid_type'])
+            if submitted:
+                thyroid_type = detect_thyroid_type(tsh, t3, t4)
+                st.session_state.patient_profile = {
+                    "name": name, "age": age, "gender": gender,
+                    "tsh": tsh, "t3": t3, "t4": t4,
+                    "thyroid_type": thyroid_type,
+                    "weight": weight, "height": height, "bmi": bmi,
+                }
+                st.session_state.editing_profile = False  # Switch to display view
+                st.success(f"✅ Profile for **{name}** saved!")
+                st.rerun() # Rerun to reflect the view change immediately
 
-            col1, col2, col3 = st.columns(3)
-            col1.metric("TSH (mIU/L)", f"{profile['tsh']:.2f}")
-            col2.metric("Free T3 (pg/mL)", f"{profile['t3']:.2f}")
-            col3.metric("Free T4 (ng/dL)", f"{profile['t4']:.2f}")
+    # ------------------ 2. THE DISPLAY VIEW (CARD) ------------------
+    else:
+        st.markdown("Here is the current patient profile. The chatbot will use this information for tailored responses.")
+        profile = st.session_state.patient_profile
+        
+        with st.container(border=True):
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.markdown(f"#### {profile.get('name', 'No Name')}")
+                st.markdown(f"**Age:** {profile.get('age', 'N/A')} | **Gender:** {profile.get('gender', 'N/A')} | **BMI:** {profile.get('bmi', 0.0):.2f}")
+            
+            with col2:
+                st.metric(label="Thyroid Status", value=profile.get('thyroid_type', 'N/A'))
+            
+            st.markdown("---")
 
-            if profile['symptoms']:
-                st.markdown(f"**Symptoms:** {profile['symptoms']}")
-            if profile['medication']:
-                st.markdown(f"**Medications:** {profile['medication']}")      
+            c1, c2, c3 = st.columns(3)
+            c1.metric("TSH (mIU/L)", f"{profile.get('tsh', 0.0):.2f}")
+            c2.metric("Free T3 (pg/mL)", f"{profile.get('t3', 0.0):.2f}")
+            c3.metric("Free T4 (ng/dL)", f"{profile.get('t4', 0.0):.2f}")
+
+        # Button to switch back to editing mode
+        if st.button("✏️ Edit Profile"):
+            st.session_state.editing_profile = True
+            st.rerun()
+
+       
 
 # ------------------ CHAT PAGE ------------------               
 
