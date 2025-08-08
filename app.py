@@ -82,8 +82,9 @@ def patient_profile_page():
                 st.markdown(f"**Age:** {profile.get('age', 'N/A')} | **Gender:** {profile.get('gender', 'N/A')} | **BMI:** {profile.get('bmi', 0.0):.2f}")
             
             with col2:
-                st.write("Thyroid Status") # Use st.write for the small label
-                st.markdown(f"<h4>{profile.get('thyroid_type', 'N/A')}</h4>", unsafe_allow_html=True)
+                st.write("Thyroid Status")
+                status = profile.get('thyroid_type', 'N/A')
+                st.markdown(f"<p style='font-size: 1.25rem; font-weight: 600;'>{status}</p>", unsafe_allow_html=True)
             
             st.markdown("---")
 
@@ -92,7 +93,7 @@ def patient_profile_page():
             c2.metric("Free T3 (pg/mL)", f"{profile.get('t3', 0.0):.2f}")
             c3.metric("Free T4 (ng/dL)", f"{profile.get('t4', 0.0):.2f}")
 
-        if st.button("✏️ Edit Profile"):
+        if st.button(" Edit Profile"):
             st.session_state.editing_profile = True
             st.rerun()
             
