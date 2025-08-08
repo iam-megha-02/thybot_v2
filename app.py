@@ -1,12 +1,19 @@
 # ------------------ IMPORTS ------------------
 import streamlit as st
 import pandas as pd
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from models.llm import get_groq_model
 from utils.rag_utils import embed_chunks, retrieve_relevant_chunks
 import tempfile
 import os
 
+# Imports for Web Search Agent
+from langchain_community.tools import DuckDuckGoSearchRun
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchainhub import pull as hub_pull
+
+# Imports for Document Handling
 from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
@@ -50,13 +57,13 @@ def load_and_split_document(uploaded_file):
 # ------------------ PAGE FUNCTIONS ------------------
 
 def patient_profile_page():
-    st.title("Patient Profile")
+    st.title("👤 Patient Profile")
     if "patient_profile" not in st.session_state:
-        st.session_state.patient_profile = {}
+        st.session_state.patient_profile = {} 
     if "editing_profile" not in st.session_state:
         st.session_state.editing_profile = not st.session_state.patient_profile.get("name")
     if st.session_state.editing_profile:
-        st.markdown("Enter or update the patient’s health information below.")
+        st.markdown("Enter or update your health information below.")
         profile_data = st.session_state.patient_profile
         with st.form("profile_form"):
             col1, col2 = st.columns(2)
@@ -111,13 +118,18 @@ def patient_profile_page():
             st.session_state.editing_profile = True
             st.rerun()
 
-# --- NEW: General Chat Page ---
 def general_chat_page():
     st.title("General Chat")
-    st.markdown("Ask questions about thyroid health. This chat uses your patient profile for context.")
+    st.markdown("Ask general questions about thyroid health. This chat can search the web for the latest information.")
     chat_model = get_groq_model()
 
-    # Initialize session state for general chat
+    # --- Agent Setup ---
+    search_tool = DuckDuckGoSearchRun()
+    tools = [search_tool]
+    prompt = hub_pull("hwchase17/xml-agent-convo")
+    agent = create_tool_calling_agent(chat_model, tools, prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
     if "general_messages" not in st.session_state:
         st.session_state.general_messages = []
 
@@ -129,30 +141,28 @@ def general_chat_page():
             st.session_state.general_messages = []
             st.rerun()
 
-    # Display chat history
     for message in st.session_state.general_messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+        with st.chat_message(message.type):
+            st.markdown(message.content)
 
-    # Handle new user input
     if prompt := st.chat_input("What would you like to know?"):
-        st.session_state.general_messages.append({"role": "user", "content": prompt})
+        st.session_state.general_messages.append(HumanMessage(content=prompt))
         with st.chat_message("user"):
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
+            with st.spinner("Thinking... "):
                 profile = st.session_state.get("patient_profile", {})
                 thyroid_type = profile.get("thyroid_type", "Not specified")
                 
-                system_message_content = (f"You are ThyBot, an expert AI medical assistant specializing in thyroid health. The user's thyroid status is '{thyroid_type}'. Your response style should be {st.session_state.response_mode}.")
+                response = agent_executor.invoke({
+                    "input": f"User's thyroid status is '{thyroid_type}'. Respond in a {st.session_state.response_mode} style. User's question: {prompt}",
+                    "chat_history": st.session_state.general_messages[:-1]
+                })
                 
-                messages_for_llm = [{"role": "system", "content": system_message_content}] + st.session_state.general_messages
-                response = chat_model.invoke(messages_for_llm)
-                reply = response.content if hasattr(response, "content") else str(response)
-
+                reply = response['output']
                 st.markdown(reply)
-                st.session_state.general_messages.append({"role": "assistant", "content": reply})
+                st.session_state.general_messages.append(AIMessage(content=reply))
 
 def document_chat_page():
     st.title("Document Chat")
@@ -191,17 +201,16 @@ def document_chat_page():
                     st.markdown(reply)
                     st.session_state.doc_messages.append({"role": "assistant", "content": reply})
         if st.button("End Document Chat Session"):
-            del st.session_state["doc_faiss_index"]
-            del st.session_state["doc_messages"]
-            del st.session_state["uploaded_file_name"]
+            if "doc_faiss_index" in st.session_state: del st.session_state["doc_faiss_index"]
+            if "doc_messages" in st.session_state: del st.session_state["doc_messages"]
+            if "uploaded_file_name" in st.session_state: del st.session_state["uploaded_file_name"]
             st.rerun()
     else:
         st.info("Upload a file to start the document chat.")
 
-
 def meal_analysis_page():
     st.title("Meal Analysis")
-    st.markdown("Select food items from a list to analyze their impact on thyroid health.")
+    st.markdown("Select food items from a list to analyze the impact on your thyroid health.")
     chat_model = get_groq_model()
     @st.cache_data
     def load_food_data():
@@ -256,10 +265,11 @@ def main():
     with st.sidebar:
         st.image("assets/logo.png", width=150)
         st.markdown("Select a feature from below:")
-        
-        page = st.radio("Navigation", ["Patient Profile", "General Chat", "Document Chat", "Meal Analysis"])
+        page = st.radio(
+            "Navigation",
+            ["Patient Profile", "General Chat", "Document Chat", "Meal Analysis"]
+        )
 
-    # --- Routing for both chat pages ---
     if page == "Patient Profile":
         patient_profile_page()
     elif page == "General Chat":
