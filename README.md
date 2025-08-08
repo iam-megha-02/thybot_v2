@@ -52,11 +52,11 @@ There is a lack of **interactive**, **AI-powered**, and **diet-aware** tools tai
 
 ---
 
-## Tech Stack
+## Tech Stack Overview
 
-- **Frontend**: Streamlit
-- **LLM**: Groq (LLaMA3)
-- **Data Processing**: Pandas
-- **Vector Search**: FAISS
-- **Others**: LangChain, dotenv, tiktoken
+**Frontend:** The entire user interface is built with Streamlit.
+**Backend & AI:** The backend logic is orchestrated by **LangChain**, which integrates several key components:
+                  **LLM:** Conversational intelligence is powered by a fast language model from **Groq (LLAMA3)**.
+                  **Document RAG:** User-uploaded documents (.pdf, .docx, .txt) are processed using **FAISS** for efficient vector-based retrieval.
+                  **Data Analysis:** The meal analysis feature uses **Pandas** to process CSV data.
 
