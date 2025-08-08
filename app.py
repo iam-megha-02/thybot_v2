@@ -20,8 +20,9 @@ def detect_thyroid_type(tsh, t3, t4):
 
 
 # ------------------ PAGE FUNCTIONS ------------------
+
 def patient_profile_page():
-    st.title("👤 Patient Profile")
+    st.title("Patient Profile")
 
     # --- STATE MANAGEMENT ---
     if "patient_profile" not in st.session_state:
@@ -29,6 +30,7 @@ def patient_profile_page():
     
     if "editing_profile" not in st.session_state:
         st.session_state.editing_profile = not st.session_state.patient_profile.get("name")
+
 
     # ------------------ 1. THE EDITING VIEW (FORM) ------------------
     if st.session_state.editing_profile:
@@ -72,7 +74,7 @@ def patient_profile_page():
 
     # ------------------ 2. THE DISPLAY VIEW (CARD) ------------------
     else:
-        st.markdown("Here is the current patient profile. The chatbot will use this information for tailored responses.")
+        st.markdown("Here is your current profile. The AI Assistant will use this information for tailored responses.")
         profile = st.session_state.patient_profile
         
         with st.container(border=True):
@@ -94,29 +96,21 @@ def patient_profile_page():
                 )
             
             st.markdown("---")
-
-            # --- THIS ENTIRE BLOCK IS CHANGED TO CENTER-ALIGN THE METRICS ---
+            
             c1, c2, c3 = st.columns(3)
-            
             metric_style = "text-align: center;"
-            
             with c1:
                 st.markdown(f"<div style='{metric_style}'><p style='font-size: 0.9rem; margin-bottom: -5px;'>TSH (mIU/L)</p><p style='font-size: 2rem; font-weight: 600;'>{profile.get('tsh', 0.0):.2f}</p></div>", unsafe_allow_html=True)
-
             with c2:
                 st.markdown(f"<div style='{metric_style}'><p style='font-size: 0.9rem; margin-bottom: -5px;'>Free T3 (pg/mL)</p><p style='font-size: 2rem; font-weight: 600;'>{profile.get('t3', 0.0):.2f}</p></div>", unsafe_allow_html=True)
-                
             with c3:
                 st.markdown(f"<div style='{metric_style}'><p style='font-size: 0.9rem; margin-bottom: -5px;'>Free T4 (ng/dL)</p><p style='font-size: 2rem; font-weight: 600;'>{profile.get('t4', 0.0):.2f}</p></div>", unsafe_allow_html=True)
-
 
         if st.button(" Edit Profile"):
             st.session_state.editing_profile = True
             st.rerun()
-                
-            
 
-# ------------------ CHAT PAGE ------------------               
+
 def chat_page():
     chat_model = get_groq_model()
 
@@ -144,16 +138,6 @@ def chat_page():
             st.session_state.messages = []
             st.rerun()
 
-        st.markdown("---")
-        st.markdown("### Document Analysis (RAG)")
-        uploaded_file = st.file_uploader("Upload a PDF report for context", type=["pdf"])
-        if uploaded_file:
-            with st.spinner("Processing document..."):
-                st.session_state["chunks"] = load_and_split_pdf(uploaded_file)
-                st.session_state["faiss_index"] = embed_chunks(st.session_state["chunks"])
-            st.success("Document ready for questions!")
-
-
     # --- Display Chat History ---
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -169,7 +153,7 @@ def chat_page():
             with st.spinner("Thinking..."):
                 profile = st.session_state.patient_profile
                 thyroid_type = profile.get("thyroid_type", "Not specified")
-
+                
                 system_message_content = (
                     f"You are ThyBot, an expert AI medical assistant specializing in thyroid health. "
                     f"The user's thyroid status is '{thyroid_type}'. "
@@ -177,7 +161,7 @@ def chat_page():
                 )
 
                 context = ""
-                
+               
                 if "faiss_index" in st.session_state:
                     docs = retrieve_relevant_chunks(prompt, st.session_state["faiss_index"])
                     if docs:
@@ -187,8 +171,7 @@ def chat_page():
                             "If the context doesn't contain the answer, say so and answer based on your general knowledge.\n\n"
                             f"CONTEXT:\n---\n{context}"
                         )
-
-            
+                
                 messages_for_llm = [
                     {"role": "system", "content": system_message_content}
                 ] + st.session_state.messages
@@ -198,88 +181,117 @@ def chat_page():
 
                 st.markdown(reply)
                 st.session_state.messages.append({"role": "assistant", "content": reply})
-                 
 
-# ------------------ MEAL PAGE ------------------  
+
 def meal_analysis_page():
     st.title("Meal Analysis")
-    st.markdown("Add food items to analyze whether they are thyroid-friendly.")
+    st.markdown("Select food items from the list to analyze their impact on thyroid health.")
 
-    df = pd.read_csv("data/Indian_Food_Nutrition_Processed.csv")
     chat_model = get_groq_model()
+    
+    @st.cache_data
+    def load_food_data():
+        df = pd.read_csv("data/Indian_Food_Nutrition_Processed.csv")
+        return df
+
+    df = load_food_data()
+    food_list = [""] + sorted(df['Dish Name'].tolist())
 
     if "meal_items" not in st.session_state:
         st.session_state.meal_items = []
+        
+    profile = st.session_state.get("patient_profile", {})
+    thyroid_type = profile.get("thyroid_type", "Not set")
 
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        new_item = st.text_input("Enter food item")
-    with col2:
-        if st.button("Add") and new_item:
-            st.session_state.meal_items.append(new_item)
+    if thyroid_type == "Not set":
+        st.error("Please create a patient profile first on the 'Patient Profile' page to get tailored meal analysis.")
+        st.stop()
+    else:
+        st.info(f"Analyzing meals for a patient with: **{thyroid_type}**")
 
-    for idx, item in enumerate(st.session_state.meal_items):
-        col1, col2 = st.columns([4, 1])
-        with col1:
-            st.markdown(f"- {item}")
-        with col2:
-            if st.button("Remove", key=f"remove_{idx}"):
-                st.session_state.meal_items.pop(idx)
-                st.rerun()
+    new_item = st.selectbox("Select a food item to add to your meal:", options=food_list)
+    if st.button("Add Item") and new_item and new_item not in st.session_state.meal_items:
+        st.session_state.meal_items.append(new_item)
+        st.rerun()
 
-    if st.button("Analyze Meal"):
-        profile = st.session_state.get("patient_profile", {})
-        thyroid_type = profile.get("thyroid_type", "Not set")
+    st.markdown("---")
+    st.markdown("#### Your Current Meal")
 
-        if thyroid_type == "Not set":
-            st.error("Please fill in your thyroid profile first from the Patient Profile page.")
-            return
+    if not st.session_state.meal_items:
+        st.write("No items added yet.")
+    else:
+        for i, item in enumerate(st.session_state.meal_items):
+            col1, col2 = st.columns([0.9, 0.1])
+            with col1:
+                st.markdown(f"- **{item}**")
+            with col2:
+                if st.button("✖️", key=f"remove_{i}", help="Remove item"):
+                    st.session_state.meal_items.pop(i)
+                    st.rerun()
 
-        for item in st.session_state.meal_items:
-            match = df[df['Dish Name'].str.lower() == item.lower()]
-            if not match.empty:
+    if st.session_state.meal_items and st.button("Analyze Meal"):
+        with st.spinner("Analyzing your meal..."):
+            for item in st.session_state.meal_items:
+                match = df[df['Dish Name'] == item]
                 row = match.iloc[0]
                 nutrients = f"Calories: {row['Calories (kcal)']:.0f} kcal | Protein: {row['Protein (g)']}g | Sugar: {row['Free Sugar (g)']}g"
                 impact = row['Thyroid_Impact']
                 prompt = (
-                    f"The user has {thyroid_type}. They are eating '{item}', which has the following nutritional values: {nutrients}. "
-                    f"The dataset marks its thyroid impact as '{impact}'. Is this good or bad for the user and why? Also suggest what else could be added or avoided."
+                    f"A patient with '{thyroid_type}' is eating '{item}'. Its known thyroid impact is '{impact}' "
+                    f"and its nutrients are: {nutrients}. Briefly explain if this food is generally beneficial, neutral, "
+                    f"or should be consumed with caution for their condition and why. "
+                    f"Provide one simple suggestion for a healthy pairing or alternative."
                 )
-            else:
-                prompt = (
-                    f"The user has {thyroid_type}. They are eating '{item}', but it is not found in the dataset. "
-                    f"Based on general nutritional knowledge, is this good or bad for thyroid health? Give a brief reason and suggest improvements."
-                )
+                
+                response = chat_model.invoke(prompt)
+                reply = response.content if hasattr(response, "content") else str(response)
 
-            response = chat_model.invoke(prompt)
-            reply = response.content if hasattr(response, "content") else response
+                with st.expander(f"Analysis for: **{item}**", expanded=True):
+                    st.info(f"**Thyroid Impact:** {impact} | **Nutrients:** {nutrients}")
+                    st.markdown(reply)
+                    
+def document_analysis_page():
+    st.title("📄 Document Analysis (RAG)")
+    st.markdown("Upload a PDF document (like a lab report) to provide extra context for the chatbot.")
+    st.info("After uploading, you can go to the **Chat** page to ask questions about the document's contents.", icon="💡")
 
-            with st.container():
-                st.markdown(f"#### 🍽️ **{item.title()}**")
-                if not match.empty:
-                    st.info(f"**Nutrients**: {nutrients}\n\n**Impact**: {impact}")
-                st.success(reply)
+    uploaded_file = st.file_uploader("Upload a PDF report", type=["pdf"])
+    if uploaded_file:
+        with st.spinner("Processing document... This may take a moment."):
+            st.session_state["chunks"] = load_and_split_pdf(uploaded_file)
+            st.session_state["faiss_index"] = embed_chunks(st.session_state["chunks"])
+        st.success("✅ Document processed successfully! You can now ask about it in the Chat page.")
+
+    if "faiss_index" in st.session_state:
+        st.markdown("---")
+        st.markdown("A document is currently loaded in memory. You can ask questions about it on the Chat page.")
+        if st.button("Remove Document"):
+            del st.session_state["chunks"]
+            del st.session_state["faiss_index"]
+            st.rerun()
 
 
 # ------------------ MAIN ------------------
-
 def main():
     st.set_page_config(page_title="ThyBot", page_icon="assets/logo.png", layout="centered")
 
     with st.sidebar:
-        st.image("assets/logo.png",width=180)
+        st.image("assets/logo.png", width=150) # Reduced logo size slightly to save space
         st.markdown("Select a feature from below:")
-        page = st.radio("Navigation", ["Chat", "Patient Profile", "Meal Analysis"])
+        # --- CHANGED: Added Document Analysis to navigation ---
+        page = st.radio("Navigation", ["Chat", "Patient Profile", "Meal Analysis", "Document Analysis"])
 
+    # --- CHANGED: Added routing for the new page ---
     if page == "Chat":
         chat_page()
     elif page == "Patient Profile":
         patient_profile_page()
     elif page == "Meal Analysis":
         meal_analysis_page()
+    elif page == "Document Analysis":
+        document_analysis_page()
 
 
 # ------------------ LAUNCH ------------------
-
 if __name__ == "__main__":
     main()
