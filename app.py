@@ -8,7 +8,6 @@ import tempfile
 import os
 
 # Imports for Web Search Agent
-from langchain_community.tools import DuckDuckGoSearchRun
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchainhub import pull as hub_pull
