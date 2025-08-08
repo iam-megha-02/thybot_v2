@@ -2,6 +2,8 @@
 
 ThyBot is a personalized, LLM-powered health assistant built with Streamlit that helps users understand their thyroid condition, analyze meals for thyroid friendliness, and receive intelligent diet recommendations.
 
+Deployment Link: https://iam-megha-02-thybot-v2-app-khrvby.streamlit.app/
+
 ## 📌 Table of Contents
 
 - [1. Background](#-background)
